@@ -10,6 +10,7 @@ Future<void> _sendMessageInternal(
   void Function(ChatSendPlaceholderHandle handle)?
   onAssistantPlaceholderCreated,
   ChatSendVoiceContext? voice,
+  void Function()? onTurnStarted,
 ]) async {
   final hermesSelectedAtStart = ref.read(selectedModelProvider) as Model?;
   if (hermesSelectedAtStart != null && isHermesModel(hermesSelectedAtStart)) {
@@ -539,6 +540,9 @@ Future<void> _sendMessageInternal(
       }
       pendingRunHandedOff = true;
       databaseLeaseHandedOff = true;
+      // The turn is in the chat and goes to its run, which this send waits
+      // out to the end, approvals and questions included.
+      onTurnStarted?.call();
       await _dispatchHermesRunFromChat(
         ref,
         assistantMessageId: assistantMessageId,
@@ -738,6 +742,9 @@ Future<void> _sendMessageInternal(
         messages: <ChatMessage>[...existingMessages, userMessage],
         systemPrompt: currentConversation?.systemPrompt,
       );
+      // The turn is in the chat and goes to its run, which this send waits
+      // out to the end, tool approvals included.
+      onTurnStarted?.call();
       await _dispatchDirectRunFromChat(
         ref,
         route: directRoute,

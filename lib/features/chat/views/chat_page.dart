@@ -1133,6 +1133,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             raw,
             modelId: model.id,
             trustedLocalDocumentKeys: trustedKeys,
+            sensitiveValues: service.config.sensitiveValues,
           )..addAll(
             hermesPendingDesktopDecisionMessages(pending, modelId: model.id),
           );
@@ -1481,6 +1482,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   onDraftCommitted(pendingSend!);
                 }
               : null,
+          // A Hermes or Direct send lasts the whole turn: its words leave
+          // the composer once the turn is handed to its run, not when an
+          // approval or question that holds the turn open is answered.
+          onTurnStarted: () {
+            if (admissionConfirmed || pendingSend == null) return;
+            admissionConfirmed = true;
+            onDraftCommitted?.call(pendingSend!);
+          },
         );
         // Inline backends have no outbox receipt. Keep their draft until
         // the existing send path has accepted it successfully.
