@@ -1105,8 +1105,11 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 !isRestoredHermesDesktopRunningPlaceholder(message),
           )
           .length;
+      // A shorter read is taken only after a change that shortened the
+      // chat (an undo it did not see); otherwise it is an incomplete one.
       if (currentAuthoritativeCount > 0 &&
-          candidateAuthoritativeCount < currentAuthoritativeCount) {
+          candidateAuthoritativeCount < currentAuthoritativeCount &&
+          !service.takeShortenedTranscript(storedId)) {
         return;
       }
       ref.read(chatMessagesProvider.notifier).setMessages(messages);
