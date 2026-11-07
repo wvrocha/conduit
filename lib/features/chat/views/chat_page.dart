@@ -56,6 +56,7 @@ import 'package:conduit_core/features/chat/providers/temporary_chat_save.dart';
 import 'package:conduit_core/features/hermes/models/hermes_model.dart';
 import 'package:conduit_core/features/hermes/models/hermes_config.dart';
 import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
+import 'package:conduit_core/features/hermes/providers/hermes_todo_providers.dart';
 import 'package:conduit_core/features/hermes/services/hermes_bot_chat.dart';
 import 'package:conduit_core/features/hermes/services/hermes_decision_projection.dart';
 import 'package:conduit_core/features/hermes/services/hermes_desktop_api_service.dart';
@@ -67,6 +68,7 @@ import 'package:conduit_core/features/hermes/services/hermes_session_provenance.
 import '../../hermes/widgets/hermes_bot_avatar.dart';
 import '../../hermes/widgets/hermes_message_interactions.dart';
 import '../../hermes/widgets/hermes_read_only_session_notice.dart';
+import '../../hermes/widgets/hermes_todo_card.dart';
 import '../widgets/live_connection_button.dart';
 import '../../navigation/providers/chat_back_provider.dart';
 import '../../navigation/utils/chat_list_back.dart';
@@ -3955,6 +3957,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       findPendingHermesComposerPrompt,
                     ),
                   );
+                  final hermesPlan = composerRef
+                      .watch(hermesActiveTodoProvider)
+                      .asData
+                      ?.value;
                   final pendingDirectMcpMetadata = composerRef.watch(
                     chatMessagesProvider.select(
                       findPendingDirectMcpComposerPrompt,
@@ -4066,7 +4072,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         PlatformUiCapabilities.isAndroid,
                     composerTextInsertionTargetId:
                         chatComposerTextInsertionTargetId,
-                    attachedOverlay: attachedOverlay,
+                    // The agent's plan sits above any prompt card.
+                    attachedOverlay: withHermesPlan(
+                      attachedOverlay,
+                      plan: hermesPlan,
+                      chatKey: activeConversationId,
+                    ),
                     onVoiceInput: null,
                     onVoiceCall: _handleVoiceCall,
                     onFileAttachment: _handleFileAttachment,
