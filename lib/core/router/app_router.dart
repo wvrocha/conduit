@@ -42,6 +42,7 @@ import '../../features/hermes/views/hermes_settings_page.dart';
 import '../../features/hermes/views/hermes_jobs_page.dart';
 import '../../features/hermes/views/hermes_mcp_page.dart';
 import '../../features/hermes/views/hermes_hidden_sessions_page.dart';
+import '../../features/hermes/views/hermes_room_page.dart';
 import '../../features/profile/views/personalization_page.dart';
 import '../../features/profile/views/profile_page.dart';
 import '../../features/notifications/views/notification_settings_page.dart';
@@ -190,6 +191,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
                 return _buildNoTransitionPage(
                   state: state,
                   child: ChannelPage(channelId: channelId),
+                );
+              },
+            ),
+            GoRoute(
+              path: Routes.hermesRoom,
+              name: RouteNames.hermesRoom,
+              pageBuilder: (context, state) {
+                final roomId = state.pathParameters['id']!;
+                return _buildNoTransitionPage(
+                  state: state,
+                  child: HermesRoomPage(
+                    key: ValueKey<String>('hermes-room-$roomId'),
+                    roomId: roomId,
+                  ),
                 );
               },
             ),

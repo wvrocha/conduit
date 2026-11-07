@@ -59,6 +59,9 @@ class Routes {
   static const String hermesSessions = '/sessions';
   static const String noteEditor = '/notes/:id';
   static const String channel = '/channel/:id';
+
+  /// One Hermes Group Chat, opened like a chat.
+  static const String hermesRoom = '/hermes-room/:id';
   static const String workspace = '/workspace';
 
   static String folderPath(String id) => '/folder/$id';
@@ -68,6 +71,8 @@ class Routes {
       '/profile/direct-connections/mcp/${Uri.encodeComponent(id)}';
   static String hermesConnectionEditorPath(String id) =>
       '/profile/hermes/connections/${Uri.encodeComponent(id)}';
+  static String hermesRoomPath(String id) =>
+      '/hermes-room/${Uri.encodeComponent(id)}';
 }
 
 /// Friendly names for GoRouter routes to support context.pushNamed.
@@ -115,6 +120,7 @@ class RouteNames {
   static const String notes = 'notes';
   static const String channels = 'channels';
   static const String hermesSessions = 'hermes-sessions';
+  static const String hermesRoom = 'hermes-room';
   static const String noteEditor = 'note-editor';
   static const String channel = 'channel';
   static const String workspace = 'workspace';
