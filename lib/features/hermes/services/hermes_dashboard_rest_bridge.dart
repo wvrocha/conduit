@@ -48,6 +48,7 @@ final class HermesDashboardRestBridge implements HermesDashboardBridge {
     Uri uri, {
     String? body,
     bool urgent = false,
+    bool Function()? beforeSend,
   }) async {
     // The headers reach the page through a script that must run before the
     // page's own, so a device that cannot guarantee that (an Android WebView
@@ -60,7 +61,13 @@ final class HermesDashboardRestBridge implements HermesDashboardBridge {
         'dashboard is unavailable.',
       );
     }
-    return _session.request(method, uri, body: body, urgent: urgent);
+    return _session.request(
+      method,
+      uri,
+      body: body,
+      urgent: urgent,
+      beforeSend: beforeSend,
+    );
   }
 
   @override
