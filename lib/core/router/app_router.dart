@@ -41,6 +41,7 @@ import '../../features/hermes/views/hermes_connections_page.dart';
 import '../../features/hermes/views/hermes_settings_page.dart';
 import '../../features/hermes/views/hermes_jobs_page.dart';
 import '../../features/hermes/views/hermes_mcp_page.dart';
+import '../../features/hermes/views/hermes_hidden_sessions_page.dart';
 import '../../features/profile/views/personalization_page.dart';
 import '../../features/profile/views/profile_page.dart';
 import '../../features/notifications/views/notification_settings_page.dart';
@@ -565,6 +566,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       name: RouteNames.hermesMcp,
       pageBuilder: (context, state) =>
           _buildPlatformPage(state: state, child: const HermesMcpPage()),
+    ),
+    GoRoute(
+      path: Routes.hermesHiddenSessions,
+      name: RouteNames.hermesHiddenSessions,
+      pageBuilder: (context, state) => _buildPlatformPage(
+        state: state,
+        child: const HermesHiddenSessionsPage(),
+      ),
     ),
     GoRoute(
       path: Routes.about,
