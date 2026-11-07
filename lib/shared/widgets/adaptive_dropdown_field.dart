@@ -100,7 +100,9 @@ class AdaptiveDropdownField<T> extends StatelessWidget {
           enabled: onChanged != null,
           errorText: state.errorText,
         );
+        // The native menu button cannot lay out inside a Material dialog.
         if (PlatformUiCapabilities.usesNativeIOS26 &&
+            !isInsideMaterialAlertDialog(context) &&
             options.isNotEmpty &&
             options.every((option) => option.subtitle?.isNotEmpty != true)) {
           final label = selected?.label ?? decoration.hintText ?? '';

@@ -91,49 +91,66 @@ final class HermesDashboardRestSession implements HermesDashboardBridge {
     String method,
     Uri uri, {
     String? body,
+    bool urgent = false,
   }) {
+    // Opening a page stays the queue's job, so an urgent request skips the
+    // queue only once one is open or opening.
+    final ready = _ready;
+    if (urgent && ready != null) {
+      return _fetch(ready, method, uri, body, queued: false);
+    }
     final completer = Completer<({int status, String body})>();
     _tail = _tail.then((_) async {
       try {
-        final page = await _ensureReady();
-        // The page refuses main-frame navigations off the dashboard; this
-        // also catches one that got through, before a request runs there.
-        final current = await page.currentUrl();
-        if (current == null || !hermesDashboardIsExactOrigin(current, _root)) {
-          await _discard(page);
-          throw StateError('Hermes dashboard page left the dashboard.');
-        }
-        final Object? value;
-        try {
-          value = await page
-              .callAsyncJavaScript(kHermesDashboardFetchScript, {
-                'url': uri.toString(),
-                'method': method,
-                // Never the access headers: arguments reach the page's own
-                // JavaScript. The page's header script (non-GET) or the
-                // host's native GET rule adds them.
-                'headers': {
-                  if (body != null) 'Content-Type': 'application/json',
-                },
-                'bodyValue': body,
-              })
-              .timeout(requestTimeout);
-        } on TimeoutException {
-          // The fetch is still running in the page. Letting the queue move
-          // on would overlap it with the next request, or reorder a write,
-          // so the page is closed (which ends the fetch) and the next
-          // request opens a fresh one.
-          await _discard(page);
-          rethrow;
-        }
-        final result = parseHermesDashboardFetchResult(value);
-        await _afterResponse?.call();
-        completer.complete(result);
+        completer.complete(
+          await _fetch(_ensureReady(), method, uri, body, queued: true),
+        );
       } catch (error, stackTrace) {
         completer.completeError(error, stackTrace);
       }
     });
     return completer.future;
+  }
+
+  Future<({int status, String body})> _fetch(
+    Future<HermesDashboardPage> ready,
+    String method,
+    Uri uri,
+    String? body, {
+    required bool queued,
+  }) async {
+    final page = await ready;
+    // The page refuses main-frame navigations off the dashboard; this also
+    // catches one that got through, before a request runs there.
+    final current = await page.currentUrl();
+    if (current == null || !hermesDashboardIsExactOrigin(current, _root)) {
+      await _discard(page);
+      throw StateError('Hermes dashboard page left the dashboard.');
+    }
+    final Object? value;
+    try {
+      value = await page
+          .callAsyncJavaScript(kHermesDashboardFetchScript, {
+            'url': uri.toString(),
+            'method': method,
+            // Never the access headers: arguments reach the page's own
+            // JavaScript. The page's header script (non-GET) or the host's
+            // native GET rule adds them.
+            'headers': {if (body != null) 'Content-Type': 'application/json'},
+            'bodyValue': body,
+          })
+          .timeout(requestTimeout);
+    } on TimeoutException {
+      // The fetch is still running in the page. Letting the queue move on
+      // would overlap it with the next request, or reorder a write, so the
+      // page is closed (which ends the fetch) and the next request opens a
+      // fresh one. An urgent request holds no queue, so its page stays.
+      if (queued) await _discard(page);
+      rethrow;
+    }
+    final result = parseHermesDashboardFetchResult(value);
+    await _afterResponse?.call();
+    return result;
   }
 
   Future<HermesDashboardPage> _ensureReady() async {
