@@ -6241,5 +6241,10 @@
   "mcpAppOpenLinkConfirm": "Otevřít",
   "terminalPortPreviewForward": "Vpřed",
   "terminalPortPreviewReload": "Načíst znovu",
-  "terminalPortPreviewLoadFailed": "Tuto stránku se nepodařilo načíst."
+  "terminalPortPreviewLoadFailed": "Tuto stránku se nepodařilo načíst.",
+  "hermesReadOnlySessionNotice": "Tento chat začal v jiné aplikaci Hermes. Můžete si ho tu přečíst, ale Hermes dovoluje Conduitu odpovídat jen v chatech, které Conduit začal.",
+  "hermesReadOnlySessionNoticeFrom": "Tento chat začal v {source}. Můžete si ho tu přečíst, ale Hermes dovoluje Conduitu odpovídat jen v chatech, které Conduit začal.",
+  "@hermesReadOnlySessionNoticeFrom": {"placeholders": {"source": {"type": "String"}}},
+  "hermesContinueInCopy": "Pokračovat v kopii",
+  "hermesContinueInCopyFailed": "Tento chat se nepodařilo zkopírovat. Zkuste to znovu."
 }

@@ -4323,5 +4323,10 @@
   "mcpAppOpenLinkConfirm": "Abrir",
   "terminalPortPreviewForward": "Adelante",
   "terminalPortPreviewReload": "Recargar",
-  "terminalPortPreviewLoadFailed": "No se pudo cargar esta página."
+  "terminalPortPreviewLoadFailed": "No se pudo cargar esta página.",
+  "hermesReadOnlySessionNotice": "Este chat empezó en otra app de Hermes. Puedes leerlo aquí, pero Hermes solo deja que Conduit responda en los chats que inició.",
+  "hermesReadOnlySessionNoticeFrom": "Este chat empezó en {source}. Puedes leerlo aquí, pero Hermes solo deja que Conduit responda en los chats que inició.",
+  "@hermesReadOnlySessionNoticeFrom": {"placeholders": {"source": {"type": "String"}}},
+  "hermesContinueInCopy": "Continuar en una copia",
+  "hermesContinueInCopyFailed": "No se pudo copiar este chat. Inténtalo de nuevo."
 }

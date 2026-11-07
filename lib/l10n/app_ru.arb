@@ -4361,5 +4361,10 @@
   "mcpAppOpenLinkConfirm": "Открыть",
   "terminalPortPreviewForward": "Вперёд",
   "terminalPortPreviewReload": "Обновить",
-  "terminalPortPreviewLoadFailed": "Не удалось загрузить эту страницу."
+  "terminalPortPreviewLoadFailed": "Не удалось загрузить эту страницу.",
+  "hermesReadOnlySessionNotice": "Этот чат начат в другом приложении Hermes. Здесь его можно читать, но Hermes разрешает Conduit отвечать только в чатах, которые начал Conduit.",
+  "hermesReadOnlySessionNoticeFrom": "Этот чат начат в {source}. Здесь его можно читать, но Hermes разрешает Conduit отвечать только в чатах, которые начал Conduit.",
+  "@hermesReadOnlySessionNoticeFrom": {"placeholders": {"source": {"type": "String"}}},
+  "hermesContinueInCopy": "Продолжить в копии",
+  "hermesContinueInCopyFailed": "Не удалось скопировать этот чат. Повторите попытку."
 }

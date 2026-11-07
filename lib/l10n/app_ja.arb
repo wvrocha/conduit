@@ -5935,5 +5935,10 @@
   "mcpAppOpenLinkConfirm": "開く",
   "terminalPortPreviewForward": "進む",
   "terminalPortPreviewReload": "再読み込み",
-  "terminalPortPreviewLoadFailed": "このページを読み込めませんでした。"
+  "terminalPortPreviewLoadFailed": "このページを読み込めませんでした。",
+  "hermesReadOnlySessionNotice": "このチャットは別の Hermes アプリで始まりました。ここで読むことはできますが、Hermes では Conduit が始めたチャットにしか返信できません。",
+  "hermesReadOnlySessionNoticeFrom": "このチャットは {source} で始まりました。ここで読むことはできますが、Hermes では Conduit が始めたチャットにしか返信できません。",
+  "@hermesReadOnlySessionNoticeFrom": {"placeholders": {"source": {"type": "String"}}},
+  "hermesContinueInCopy": "コピーで続ける",
+  "hermesContinueInCopyFailed": "このチャットをコピーできませんでした。もう一度お試しください。"
 }

@@ -66,6 +66,7 @@ import 'package:conduit_core/features/hermes/services/hermes_session_provenance.
 
 import '../../hermes/widgets/hermes_bot_avatar.dart';
 import '../../hermes/widgets/hermes_message_interactions.dart';
+import '../../hermes/widgets/hermes_read_only_session_notice.dart';
 import '../widgets/live_connection_button.dart';
 import '../../navigation/providers/chat_back_provider.dart';
 import '../../navigation/utils/chat_list_back.dart';
@@ -3971,6 +3972,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                     ),
                   )) {
                     return _buildReadOnlyNotice(context);
+                  }
+                  final readOnlyHermesSource = watchHermesReadOnlySessionSource(
+                    composerRef,
+                    activeConversation,
+                  );
+                  if (readOnlyHermesSource != null) {
+                    return HermesReadOnlySessionNotice(
+                      source: readOnlyHermesSource,
+                    );
                   }
                   return ModernChatInput(
                     onSendMessage: _handleMessageSend,
