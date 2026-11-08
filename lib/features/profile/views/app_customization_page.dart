@@ -1853,6 +1853,8 @@ class AppCustomizationPage extends ConsumerWidget {
         return AppLocalizations.of(context)!.korean;
       case 'ja':
         return AppLocalizations.of(context)!.japanese;
+      case 'pt-BR':
+        return AppLocalizations.of(context)!.portugueseBrazilian;
       case 'zh-Hant':
         return AppLocalizations.of(context)!.chineseTraditional;
       default:
@@ -1876,6 +1878,9 @@ class AppCustomizationPage extends ConsumerWidget {
         }
         if (normalizedCode == 'pl') {
           return AppLocalizations.of(context)!.polish;
+        }
+        if (normalizedCode == 'pt-br') {
+          return AppLocalizations.of(context)!.portugueseBrazilian;
         }
         return AppLocalizations.of(context)!.system;
     }
@@ -2096,6 +2101,7 @@ class AppCustomizationPage extends ConsumerWidget {
       (value: 'zh-Hant', label: l10n.chineseTraditional),
       (value: 'ko', label: l10n.korean),
       (value: 'ja', label: l10n.japanese),
+      (value: 'pt-BR', label: l10n.portugueseBrazilian),
     ];
 
     if (Platform.isIOS) {
