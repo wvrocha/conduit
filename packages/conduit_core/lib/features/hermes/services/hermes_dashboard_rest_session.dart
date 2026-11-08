@@ -148,7 +148,14 @@ final class HermesDashboardRestSession implements HermesDashboardBridge {
     // catches one that got through, before a request runs there.
     final current = await page.currentUrl();
     if (current == null || !hermesDashboardIsExactOrigin(current, _root)) {
-      await _discard(page);
+      // An urgent request is among those the discard waits for, so it
+      // settles first and the page closes after it.
+      final discarded = _discard(page);
+      if (queued) {
+        await discarded;
+      } else {
+        unawaited(discarded);
+      }
       throw StateError('Hermes dashboard page left the dashboard.');
     }
     // Asked with nothing awaited before the send, so a withdrawal is
