@@ -8,6 +8,7 @@ import 'package:conduit_core/providers/app_providers.dart';
 
 import '../../../features/release_notes/data/release_notes_repository.dart';
 import '../../../features/release_notes/release_notes_presenter.dart';
+import '../../../core/config/dtp_lia.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/external_link_launcher.dart';
@@ -53,6 +54,8 @@ class _AboutPageState extends ConsumerState<AboutPage> {
             message: l10n.unableToLoadAppInfo,
           ),
         ),
+        settingsSectionGap,
+        _buildForkCreditCard(context),
         settingsSectionGap,
         serverAboutAsync.when(
           data: (about) => about == null
@@ -153,6 +156,19 @@ class _AboutPageState extends ConsumerState<AboutPage> {
           onTap: () => _showLicenses(context),
         ),
       ],
+    );
+  }
+
+  /// Origem do código: o app é um fork, e a licença GPLv3 exige dar o crédito.
+  Widget _buildForkCreditCard(BuildContext context) {
+    return InsetGroupedSection(
+      title: DtpLiaConfig.forkCreditTitle,
+      child: Text(
+        DtpLiaConfig.forkCreditBody,
+        style: AppTypography.bodyMediumStyle.copyWith(
+          color: context.conduitTheme.textSecondary,
+        ),
+      ),
     );
   }
 

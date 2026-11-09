@@ -30,6 +30,15 @@ class DtpLiaConfig {
   static const bool showSupportSection = false;
   static const bool showStoreReviewAction = false;
 
+  /// Créditos na tela "Sobre": origem do código e responsável por esta versão.
+  static const String forkCreditTitle = 'Créditos';
+  static const String forkCreditBody =
+      'O LIA é um fork do Conduit, cliente de código aberto para Open WebUI '
+      'criado por Tunap Paul (github.com/cogwheel0/conduit). Esta versão foi '
+      'adaptada por William Veronesi para uso na Dataprev, sob a licença '
+      'GNU GPLv3.';
+  static const String upstreamProjectUrl = 'https://github.com/cogwheel0/conduit';
+
   /// Crédito institucional exibido no splash e na tela "Sobre".
   static const String institutionalCredit = 'Uma solução Dataprev';
 }
