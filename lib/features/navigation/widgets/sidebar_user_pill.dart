@@ -5,6 +5,7 @@ import 'dart:io' show Platform;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:conduit/core/config/dtp_lia.dart';
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:conduit/l10n/app_localizations.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
@@ -767,7 +768,9 @@ class SidebarProfileAppBarLeading extends ConsumerWidget {
       card: (title: card.title, subtitle: card.subtitle),
       otherAccountCount: readNativeOtherAccountCount(ref.read),
     );
-    final supportItems = buildNativeSupportItems(l10n);
+    final supportItems = DtpLiaConfig.showSupportSection
+        ? buildNativeSupportItems(l10n)
+        : <NativeSheetItemConfig>[];
     // The native sheet lays itself out from [sections]; the flat lists are
     // its fallback when a payload carries none.
     final menuItems = <NativeSheetItemConfig>[

@@ -1,3 +1,4 @@
+import 'package:conduit/core/config/dtp_lia.dart';
 import 'package:flutter/foundation.dart' show Uint8List, immutable;
 import 'package:intl/intl.dart';
 
@@ -331,7 +332,9 @@ List<NativeSheetSectionConfig> buildNativeProfileRootSections(
       ),
     NativeSheetSectionConfig(
       title: l10n.supportConduit,
-      items: buildNativeSupportItems(l10n),
+      items: DtpLiaConfig.showSupportSection
+          ? buildNativeSupportItems(l10n)
+          : const <NativeSheetItemConfig>[],
     ),
   ];
 }

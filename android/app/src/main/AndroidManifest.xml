@@ -51,7 +51,7 @@
          ForegroundServiceDidNotStartInTimeException. This ensures channels exist before
          any foreground service attempts to use them. -->
     <application
-        android:label="Conduit"
+        android:label="LIA"
         android:name=".ConduitApplication"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
@@ -77,7 +77,7 @@
 
         <service
             android:name=".ConduitRecognitionService"
-            android:label="Conduit"
+            android:label="LIA"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.speech.RecognitionService" />
@@ -138,7 +138,7 @@
         <activity
             android:name=".ProcessTextActivity"
             android:exported="true"
-            android:label="Ask Conduit"
+            android:label="Perguntar à LIA"
             android:noHistory="true">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />

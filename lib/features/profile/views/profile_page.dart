@@ -1,3 +1,4 @@
+import 'package:conduit/core/config/dtp_lia.dart';
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 
 import 'package:material_ui/material_ui.dart';
@@ -177,7 +178,7 @@ class ProfilePage extends ConsumerWidget {
         const SizedBox(height: Spacing.lg),
         ...items,
         const SizedBox(height: Spacing.xl),
-        _buildDonationSection(context),
+        if (DtpLiaConfig.showSupportSection) _buildDonationSection(context),
         if (hasOpenWebUiAccount) const SizedBox(height: Spacing.xl),
         if (hasOpenWebUiAccount)
           InsetGroupedList(

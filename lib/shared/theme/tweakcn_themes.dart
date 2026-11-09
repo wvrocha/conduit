@@ -197,7 +197,102 @@ Color mix(Color a, Color b, double amount) {
   return a;
 }
 
+/// Paleta institucional Dataprev — manual de identidade visual 2025.
+///
+/// Vive aqui, e não em `packages/conduit_theme`, porque é exclusiva desta
+/// distribuição: o registro do pacote amarra rótulo e descrição a chaves ARB de
+/// 15 idiomas, e uma paleta de fork não deve impor tradução a todos eles.
+/// Cores do manual: azul institucional `#0066b3`, texto em `#262626` (o manual
+/// não admite preto puro), superfícies brancas e bordas neutras.
+const _dataprevLight = core.ThemeVariant(
+  background: 0xFFFFFFFF,
+  foreground: 0xFF262626,
+  card: 0xFFFFFFFF,
+  cardForeground: 0xFF262626,
+  popover: 0xFFFFFFFF,
+  popoverForeground: 0xFF262626,
+  primary: 0xFF0066B3,
+  primaryForeground: 0xFFFFFFFF,
+  secondary: 0xFFE9F2F9,
+  secondaryForeground: 0xFF00527F,
+  muted: 0xFFF4F6F8,
+  mutedForeground: 0xFF666666,
+  accent: 0xFFE9F2F9,
+  accentForeground: 0xFF00527F,
+  destructive: 0xFFB3261E,
+  destructiveForeground: 0xFFFFFFFF,
+  border: 0xFFDDE4EA,
+  input: 0xFFDDE4EA,
+  ring: 0xFF0066B3,
+  sidebarBackground: 0xFFF7F9FB,
+  sidebarForeground: 0xFF262626,
+  sidebarPrimary: 0xFF0066B3,
+  sidebarPrimaryForeground: 0xFFFFFFFF,
+  sidebarAccent: 0xFFE9F2F9,
+  sidebarAccentForeground: 0xFF00527F,
+  sidebarBorder: 0xFFDDE4EA,
+  sidebarRing: 0xFF0066B3,
+  success: 0xFF1B7A4B,
+  successForeground: 0xFFFFFFFF,
+  warning: 0xFF8A5A00,
+  warningForeground: 0xFFFFFFFF,
+  info: 0xFF0066B3,
+  infoForeground: 0xFFFFFFFF,
+  radius: 12,
+);
+
+const _dataprevDark = core.ThemeVariant(
+  background: 0xFF1C1C1C,
+  foreground: 0xFFF2F2F2,
+  card: 0xFF242424,
+  cardForeground: 0xFFF2F2F2,
+  popover: 0xFF242424,
+  popoverForeground: 0xFFF2F2F2,
+  primary: 0xFF4FA8E0,
+  primaryForeground: 0xFF0C2434,
+  secondary: 0xFF2B3944,
+  secondaryForeground: 0xFFDCE9F2,
+  muted: 0xFF262626,
+  mutedForeground: 0xFFB0B0B0,
+  accent: 0xFF2B3944,
+  accentForeground: 0xFFDCE9F2,
+  destructive: 0xFFE4695E,
+  destructiveForeground: 0xFF3A0E0A,
+  border: 0xFF343434,
+  input: 0xFF343434,
+  ring: 0xFF4FA8E0,
+  sidebarBackground: 0xFF171717,
+  sidebarForeground: 0xFFF2F2F2,
+  sidebarPrimary: 0xFF4FA8E0,
+  sidebarPrimaryForeground: 0xFF0C2434,
+  sidebarAccent: 0xFF2B3944,
+  sidebarAccentForeground: 0xFFDCE9F2,
+  sidebarBorder: 0xFF343434,
+  sidebarRing: 0xFF4FA8E0,
+  success: 0xFF5FBF8F,
+  successForeground: 0xFF08251A,
+  warning: 0xFFE0A94B,
+  warningForeground: 0xFF2B1E00,
+  info: 0xFF4FA8E0,
+  infoForeground: 0xFF0C2434,
+  radius: 12,
+);
+
 class TweakcnThemes {
+  /// Paleta institucional, padrão desta distribuição.
+  static final TweakcnThemeDefinition dataprev = TweakcnThemeDefinition(
+    id: 'dataprev',
+    labelBuilder: (_) => 'Dataprev',
+    descriptionBuilder: (_) => 'Azul institucional sobre superfícies claras.',
+    light: TweakcnThemeVariant.fromCore(_dataprevLight),
+    dark: TweakcnThemeVariant.fromCore(_dataprevDark),
+    preview: const <Color>[
+      Color(0xFF0066B3),
+      Color(0xFFFFFFFF),
+      Color(0xFF262626),
+    ],
+  );
+
   static final TweakcnThemeDefinition conduit = _byId('conduit');
   static final TweakcnThemeDefinition claude = _byId('claude');
   static final TweakcnThemeDefinition t3Chat = _byId('t3_chat');
@@ -205,6 +300,7 @@ class TweakcnThemes {
   static final TweakcnThemeDefinition tangerine = _byId('tangerine');
 
   static List<TweakcnThemeDefinition> all = [
+    dataprev,
     conduit,
     claude,
     t3Chat,
@@ -213,7 +309,7 @@ class TweakcnThemes {
   ];
 
   static TweakcnThemeDefinition byId(String? id) {
-    return all.firstWhere((theme) => theme.id == id, orElse: () => conduit);
+    return all.firstWhere((theme) => theme.id == id, orElse: () => dataprev);
   }
 
   static TweakcnThemeDefinition _byId(String id) {

@@ -10,6 +10,7 @@
 /// decision about what to render is here.
 library;
 
+import 'package:conduit/core/config/dtp_lia.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -117,7 +118,10 @@ class AppLocale extends _$AppLocale {
       final parsed = _parseLocaleCode(code);
       if (parsed != null) return parsed;
     }
-    return null; // system default
+    return const Locale(
+      DtpLiaConfig.defaultLocaleLanguage,
+      DtpLiaConfig.defaultLocaleCountry,
+    );
   }
 
   Future<void> setLocale(Locale? locale) async {

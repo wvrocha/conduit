@@ -1,3 +1,4 @@
+import 'package:conduit/core/config/dtp_lia.dart';
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
@@ -124,6 +125,7 @@ class ReleaseNotesSheet extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: useCompactSupport ? Spacing.sm : Spacing.md),
+                  if (DtpLiaConfig.showSupportSection)
                   _StaggeredReveal(
                     index: revealIndex++,
                     child: _ReleaseSupportSection(

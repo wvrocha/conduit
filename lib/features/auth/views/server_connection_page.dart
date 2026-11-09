@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show File, HandshakeException, HttpException, SocketException;
 
+import 'package:conduit/core/config/dtp_lia.dart';
 import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
@@ -427,7 +428,9 @@ class ServerConnectionPage extends ConsumerStatefulWidget {
 
 class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _urlController = TextEditingController();
+  final TextEditingController _urlController = TextEditingController(
+    text: DtpLiaConfig.defaultServerUrl,
+  );
   final Map<String, String> _customHeaders = {};
   final TextEditingController _headerKeyController = TextEditingController();
   final TextEditingController _headerValueController = TextEditingController();

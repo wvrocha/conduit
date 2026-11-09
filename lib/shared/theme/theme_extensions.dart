@@ -1207,7 +1207,8 @@ bool _usesAppleTypographyRamp(TargetPlatform platform) {
 ///
 /// Content and product UI use one stable hierarchy on every platform.
 class AppTypography {
-  static const String? fontFamily = null;
+  /// Fonte institucional da Dataprev (Plus Jakarta Sans, embarcada em assets/fonts).
+  static const String? fontFamily = 'PlusJakartaSans';
   static String get monospaceFontFamily =>
       _usesAppleTypographyRamp(defaultTargetPlatform) ? 'Menlo' : 'monospace';
 

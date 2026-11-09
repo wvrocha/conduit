@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Conduit</string>
+    <string name="app_name">LIA</string>
     
     <!-- Widget strings -->
-    <string name="widget_name">Conduit</string>
-    <string name="widget_description">Quick access to Conduit chat with camera, photos, and clipboard shortcuts</string>
-    <string name="widget_ask_conduit">Ask Conduit</string>
-    <string name="widget_camera">Camera</string>
-    <string name="widget_photos">Photos</string>
-    <string name="widget_clipboard">Clipboard</string>
-    <string name="widget_mic">Voice</string>
+    <string name="widget_name">LIA</string>
+    <string name="widget_description">Acesso rápido ao chat da LIA com câmera, fotos e área de transferência</string>
+    <string name="widget_ask_conduit">Perguntar à LIA</string>
+    <string name="widget_camera">Câmera</string>
+    <string name="widget_photos">Fotos</string>
+    <string name="widget_clipboard">Área de transferência</string>
+    <string name="widget_mic">Voz</string>
 </resources>
 
 
