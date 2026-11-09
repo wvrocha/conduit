@@ -10,12 +10,14 @@ import 'package:conduit_core/persistence/preferences_store.dart';
 import 'package:conduit_core/features/direct_connections/services/apple_pcc_host.dart';
 
 import 'package:conduit_core/features/librechat/providers/librechat_providers.dart';
+import 'package:conduit_core/providers/app_providers.dart';
 import 'package:conduit_core/providers/backend_mode_providers.dart';
 
 import '../../../shared/services/navigation_service.dart';
 
 import 'package:conduit_core/features/direct_connections/providers/direct_connection_providers.dart';
 
+import '../../../core/config/dtp_lia.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/widgets/platform_ui/platform_ui.dart';
@@ -28,6 +30,20 @@ class BackendChooserPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (DtpLiaConfig.autoConnectToDefaultServer) {
+      final activeServer = ref.watch(activeServerProvider);
+      if (activeServer.isLoading) {
+        return const _StartupRedirectPlaceholder();
+      }
+      if (activeServer.value == null) {
+        // Instalação pré-configurada: não há backend a escolher.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) context.go(Routes.serverConnection);
+        });
+        return const _StartupRedirectPlaceholder();
+      }
+    }
+
     final l10n = AppLocalizations.of(context)!;
     final theme = context.conduitTheme;
     final appleOnDeviceStatus = PlatformInfo.isIOS
@@ -392,6 +408,19 @@ class _AppleModelIcon extends StatelessWidget {
         color: theme.buttonPrimary,
         size: IconSize.medium,
       ),
+    );
+  }
+}
+
+/// Fundo neutro enquanto o app decide para onde ir na primeira execução.
+class _StartupRedirectPlaceholder extends StatelessWidget {
+  const _StartupRedirectPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: const SizedBox.expand(),
     );
   }
 }

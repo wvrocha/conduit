@@ -14,6 +14,13 @@ class DtpLiaConfig {
   /// O usuário cai direto no SSO Keycloak da Dataprev, sem digitar endereço.
   static const String defaultServerUrl = 'https://lia.dataprev.gov.br';
 
+  /// Conecta sozinho ao servidor padrão na primeira execução.
+  ///
+  /// Ligado, o app não mostra o seletor de backend nem o formulário de
+  /// endereço: vai direto ao SSO da LIA. A escolha de backend continua
+  /// disponível para quem adiciona outra conta/servidor depois.
+  static const bool autoConnectToDefaultServer = true;
+
   /// Idioma padrão do app.
   static const String defaultLocaleLanguage = 'pt';
   static const String defaultLocaleCountry = 'BR';

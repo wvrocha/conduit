@@ -501,7 +501,23 @@ class _ServerConnectionPageState extends ConsumerState<ServerConnectionPage> {
       unawaited(_carryOn(handoff));
     } else {
       _prefillFromState();
+      _autoConnectToDefaultServer();
     }
+  }
+
+  /// Primeira execução de uma instalação pré-configurada: conecta sozinho ao
+  /// servidor padrão, sem o usuário digitar o endereço nem tocar em "Conectar".
+  /// Se falhar, a página continua na tela com a mensagem de erro e o botão.
+  void _autoConnectToDefaultServer() {
+    if (!DtpLiaConfig.autoConnectToDefaultServer) return;
+    if (DtpLiaConfig.defaultServerUrl.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final activeServer = await ref.read(activeServerProvider.future);
+      if (!mounted || activeServer != null) return;
+      if (_urlController.text.trim() != DtpLiaConfig.defaultServerUrl) return;
+      await _connectToServer();
+    });
   }
 
   /// Carries on from what the account sheet checked: on to sign-in when the
