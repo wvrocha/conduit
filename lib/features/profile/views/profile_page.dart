@@ -29,6 +29,8 @@ import 'package:conduit_core/features/integrations/providers/personal_connection
 import 'package:conduit_core/providers/backend_mode_providers.dart';
 import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit_core/features/librechat/providers/librechat_providers.dart';
+import 'package:conduit_core/features/push/providers/push_providers.dart'
+    show notificationsWithoutAccountProvider;
 
 import '../../../shared/services/navigation_service.dart';
 
@@ -305,7 +307,7 @@ class ProfilePage extends ConsumerWidget {
 
   /// Who Settings is for -- the Open WebUI account signed in, else the
   /// Hermes connection in use, else Direct -- leading to every account and
-  /// connection, with the way to add another under it.
+  /// connection. Adding another is the last row of that page.
   Widget _buildAccountCard(
     BuildContext context,
     WidgetRef ref, {
@@ -374,17 +376,6 @@ class ProfilePage extends ConsumerWidget {
           showChevron: true,
           onTap: () => context.pushNamed(RouteNames.accounts),
         ),
-        UtilityRow(
-          key: const Key('settings-add-account'),
-          title: l10n.accountsAddAccount,
-          foregroundColor: theme.buttonPrimary,
-          leading: _buildIconBadge(
-            context,
-            UiUtils.platformIcon(ios: CupertinoIcons.add, android: Icons.add),
-            color: theme.buttonPrimary,
-          ),
-          onTap: () => showAddAccountSheet(context, ref),
-        ),
       ],
     );
   }
@@ -413,6 +404,20 @@ class ProfilePage extends ConsumerWidget {
       chatDataControlsEntryVisibleProvider,
     );
 
+    // Notifications are device-level too: Hermes replies and scheduled
+    // tasks notify, and push can be turned off, without an account.
+    final showNotificationsWithoutAccount =
+        !hasOpenWebUiAccount && ref.watch(notificationsWithoutAccountProvider);
+    final notificationsItem = _buildAccountOption(
+      context,
+      key: const Key('settings-notifications'),
+      icon: UiUtils.platformIcon(
+        ios: CupertinoIcons.bell,
+        android: Icons.notifications_outlined,
+      ),
+      title: l10n.notificationsTitle,
+      onTap: () => context.pushNamed(RouteNames.notificationSettings),
+    );
     final personalizationItem = _buildAccountOption(
       context,
       icon: UiUtils.platformIcon(
@@ -435,15 +440,7 @@ class ProfilePage extends ConsumerWidget {
           title: l10n.profileTitle,
           onTap: () => context.pushNamed(RouteNames.accountSettings),
         ),
-        _buildAccountOption(
-          context,
-          icon: UiUtils.platformIcon(
-            ios: CupertinoIcons.bell,
-            android: Icons.notifications_outlined,
-          ),
-          title: l10n.notificationsTitle,
-          onTap: () => context.pushNamed(RouteNames.notificationSettings),
-        ),
+        notificationsItem,
         personalizationItem,
         _buildAccountOption(
           context,
@@ -487,6 +484,7 @@ class ProfilePage extends ConsumerWidget {
         title: l10n.audioSettingsTitle,
         onTap: () => context.pushNamed(RouteNames.audioSettings),
       ),
+      if (showNotificationsWithoutAccount) notificationsItem,
       // Without an account, Direct's default model is set there, and
       // LibreChat's memories are kept there.
       if (!hasOpenWebUiAccount &&

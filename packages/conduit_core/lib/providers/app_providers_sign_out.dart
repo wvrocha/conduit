@@ -46,6 +46,28 @@ void _resetProvidersAfterFullAppDataClear(Ref ref) {
   ref.read(openWebUiValidatedIdentityLedgerProvider).clear();
 }
 
+/// Called once the user has signed out: of the Open WebUI account
+/// [accountId], which is then removed (or, after a plain logout, kept to
+/// sign in to again), or of everything when it is null. The host clears what
+/// the core cannot name: the notifications posted for it.
+final hostSignedOutProvider = Provider<void Function(String? accountId)>(
+  (ref) => (_) {},
+);
+
+/// Tells the host about a sign-out; its failure is only logged.
+void notifyHostSignedOut(Ref ref, String? accountId) {
+  try {
+    ref.read(hostSignedOutProvider)(accountId);
+  } catch (error, stackTrace) {
+    DebugLogger.error(
+      'host-sign-out-hook-failed',
+      scope: 'auth/accounts',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+}
+
 final signOutCoordinatorProvider = Provider<SignOutCoordinator>(
   SignOutCoordinator.new,
 );
@@ -134,6 +156,12 @@ final class SignOutCoordinator {
       }
     }
 
+    // Before any session ends or anything is wiped: push subscriptions are
+    // removed from their servers while the sessions still work. Bounded;
+    // never throws.
+    final pushHook = _ref.read(pushSignOutHookProvider);
+    if (pushHook.inUse) await pushHook.beforeFullSignOut();
+
     // Every saved account goes, not just the active one: end their sessions
     // on the server too, listed now while the registry still names them.
     final inactiveSessions = await _ref
@@ -177,6 +205,9 @@ final class SignOutCoordinator {
         case FullAppDataClearOutcome.cleared ||
             FullAppDataClearOutcome.localDataClearedSessionCleanupIncomplete:
           directRuns.commitAppDataClear();
+          // Signed out for good: every account's notifications go now, so a
+          // purge below that fails can't leave their previews on screen.
+          notifyHostSignedOut(_ref, null);
           // The auth transaction has committed and did not yield to a newer
           // session. Only now is it safe to destructively remove the
           // app-global direct-local database; beforeClear is a reversible
@@ -210,6 +241,7 @@ final class SignOutCoordinator {
           // Awaited last: it persists the restart marker that keeps surviving
           // Direct profiles hidden, and must be durable before returning.
           await directProfiles.revokeRuntimeAfterIncompleteAppDataClear();
+          notifyHostSignedOut(_ref, null);
         case FullAppDataClearOutcome.ownershipYielded:
           await disarmIncompleteAppDataClearMarker();
           resumeGlobalAdmission();

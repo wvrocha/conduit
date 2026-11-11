@@ -24,6 +24,7 @@ import 'package:conduit_core/features/chat/providers/chat_providers.dart'
         stopOpenWebUiMainResponse;
 import 'package:conduit_core/features/direct_connections/providers/direct_connection_providers.dart';
 import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
+import 'package:conduit_core/features/push/providers/push_providers.dart';
 import 'package:conduit_core/persistence/persistence_keys.dart';
 import 'package:conduit_core/persistence/preferences_store.dart';
 import 'package:conduit_core/providers/app_providers.dart';
@@ -93,8 +94,8 @@ final accountChangeStopRepliesProvider = Provider<void Function()>((ref) {
 });
 
 /// Called after the active Open WebUI account changed, with the new one (or
-/// null). The host clears what the core cannot name: posted notifications,
-/// home-screen widgets.
+/// null), for the host to follow. Posted notifications stay: each opens in
+/// the account that posted it.
 final hostActiveAccountChangedProvider = Provider<void Function(String?)>(
   (ref) => (_) {},
 );
@@ -260,9 +261,14 @@ class OpenWebUiAccountsController {
         data: {'errorType': error.runtimeType.toString()},
       );
     }
+    // While the session still works: the account's push subscription is
+    // removed from its server with its own token. Bounded; never throws.
+    final pushHook = _ref.read(pushSignOutHookProvider);
+    if (pushHook.inUse) await pushHook.beforeOpenWebUiSignOut(accountId);
     final signedIn = await _ref
         .read(authStateManagerProvider.notifier)
         .signOutAccount(accountId, thenActivate: next);
+    notifyHostSignedOut(_ref, accountId);
     // Read again: the sign-out waited on the server, and what is active now
     // is what it left, or what a sign-in made active meanwhile.
     final String? now;

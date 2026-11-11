@@ -89,6 +89,8 @@ final comparisonCommandAvailableProvider = Provider<bool>((ref) {
   )) {
     return false;
   }
+  // Open WebUI answers a coding agent only in a chat it has to itself.
+  if (ref.watch(activeChatUsesTerminalAgentProvider)) return false;
   return ref.watch(comparisonRuntimeAvailableProvider);
 });
 
@@ -313,6 +315,14 @@ Future<List<ChatSendPlaceholderHandle>> durableCompareSend(
     requireSourceContext: () =>
         _requireChatMutationOpenWebUiAuthSession(ref, sendMutationOwner),
   );
+  // Temporary Chat may have been switched on while the files were looked up,
+  // before the turn shows: this turn would still be saved, so it is refused
+  // as it would have been at the start.
+  if (ref.read(temporaryChatEnabledProvider)) {
+    throw const ComparisonAdmissionException(
+      ComparisonAdmissionFailure.unavailable,
+    );
+  }
   final durableFiles = <Map<String, dynamic>>[
     ...durableAttachmentFiles,
     ...contextFiles,

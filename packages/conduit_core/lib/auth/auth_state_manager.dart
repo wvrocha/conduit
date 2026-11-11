@@ -31,6 +31,7 @@ import 'package:conduit_core/auth/openwebui_account_summaries.dart';
 import 'package:conduit_core/database/account_storage_isolation.dart';
 import 'package:conduit_core/database/database_provider.dart';
 import 'package:conduit_core/providers/host_ports.dart';
+import 'package:conduit_core/features/push/providers/push_providers.dart';
 
 part 'auth_state_manager.g.dart';
 
@@ -3652,8 +3653,34 @@ class AuthStateManager extends _$AuthStateManager {
     ref.invalidate(apiServiceProvider);
   }
 
+  /// Signs out of the account in use, keeping its record to sign in to
+  /// again (after a password change, say). Its posted notifications go with
+  /// the session, as with any other sign-out.
   Future<void> logout() async {
-    await _runLogout(clearAllAppData: false, keepServerDetails: true);
+    // Read before anything is awaited, as the logout itself reads it.
+    final accountId = _accountLeftByPlainLogout();
+    final outcome = await _runLogout(
+      clearAllAppData: false,
+      keepServerDetails: true,
+    );
+    if (accountId != null &&
+        outcome != FullAppDataClearOutcome.ownershipYielded) {
+      notifyHostSignedOut(ref, accountId);
+    }
+  }
+
+  /// The account a plain logout leaves: the one in use, else the one stored
+  /// as active while that is still loading. A refresh keeps the account it
+  /// is leaving as its value until then, so loading is what tells.
+  String? _accountLeftByPlainLogout() {
+    final storedActiveId = PreferencesStore.getString(
+      PreferenceKeys.activeServerId,
+    );
+    final activeServer = ref.read(activeServerProvider);
+    return (activeServer.isLoading ? null : activeServer.asData?.value?.id) ??
+        (storedActiveId == null || storedActiveId.isEmpty
+            ? null
+            : storedActiveId);
   }
 
   /// Signs out and wipes all local app data. When [keepServerDetails] is true,
@@ -3703,19 +3730,10 @@ class AuthStateManager extends _$AuthStateManager {
     final logoutToken = logoutApi?.authToken;
     // The plain logout deletes the account's chats, as logout always has.
     // Its record and settings stay, to sign in to again. Read now, with
-    // nothing awaited: the account in use, else the one stored as active
-    // while that is still loading. A refresh keeps the account it is leaving
-    // as its value until then, so loading is what tells.
-    final storedActiveId = PreferencesStore.getString(
-      PreferenceKeys.activeServerId,
-    );
-    final activeServer = ref.read(activeServerProvider);
+    // nothing awaited.
     final loggedOutAccountId = clearAllAppData
         ? null
-        : (activeServer.isLoading ? null : activeServer.asData?.value?.id) ??
-              (storedActiveId == null || storedActiveId.isEmpty
-                  ? null
-                  : storedActiveId);
+        : _accountLeftByPlainLogout();
     final attemptRevision = _beginAuthAttempt();
     _update(
       (current) =>
@@ -3859,6 +3877,15 @@ class AuthStateManager extends _$AuthStateManager {
         // as another locked iteration before publishing any local result.
         DebugLogger.auth('Logout clearing a resurrected revoked session');
       }
+    }
+
+    // While the session still works, and before the restart fence below
+    // drops a proxy's cookies: the account's push subscription is removed
+    // from its server with its own token. Bounded; never throws. Signing out
+    // of everything did this already, and without push nothing waits.
+    final pushHook = ref.read(pushSignOutHookProvider);
+    if (!clearAllAppData && logoutApi != null && pushHook.inUse) {
+      await pushHook.beforeOpenWebUiSignOut(logoutApi.serverConfig.id);
     }
 
     try {

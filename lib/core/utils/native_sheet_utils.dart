@@ -1,7 +1,7 @@
-import 'package:conduit/core/config/dtp_lia.dart';
 import 'package:flutter/foundation.dart' show Uint8List, immutable;
 import 'package:intl/intl.dart';
 
+import '../../core/config/dtp_lia.dart';
 import '../../l10n/app_localizations.dart';
 import '../../shared/utils/locale_display_formatters.dart';
 
@@ -24,6 +24,10 @@ import 'package:conduit_core/providers/app_providers.dart'
 
 import '../../features/hermes/widgets/hermes_connection_switcher.dart'
     show hermesConnectionSummary;
+import 'package:conduit_core/features/push/models/push_status.dart';
+import 'package:conduit_core/features/push/models/push_target.dart';
+import '../../features/push/widgets/push_target_actions.dart'
+    show pushStatusText, pushTargetBusy, pushTargetNeedsAttention;
 import 'account_display.dart';
 import 'message_action_settings.dart';
 import 'tts_voice_utils.dart';
@@ -111,6 +115,7 @@ class NativeProfileRootVisibility {
     this.showScheduledTasks = false,
     this.showPersonalConnections = false,
     this.showChatDataControls = false,
+    this.showNotificationsWithoutAccount = false,
     this.showLibreChatPersonalization = false,
   });
 
@@ -119,6 +124,10 @@ class NativeProfileRootVisibility {
   final bool showScheduledTasks;
   final bool showPersonalConnections;
   final bool showChatDataControls;
+
+  /// Whether Notifications is listed when there is no Open WebUI account
+  /// (with one it always is): a Hermes connection is saved, or push is on.
+  final bool showNotificationsWithoutAccount;
 
   /// LibreChat is in charge, with no Open WebUI account: its memories are
   /// on the Flutter Personalization page, as the Flutter Settings page has
@@ -133,6 +142,8 @@ class NativeProfileRootVisibility {
       other.showScheduledTasks == showScheduledTasks &&
       other.showPersonalConnections == showPersonalConnections &&
       other.showChatDataControls == showChatDataControls &&
+      other.showNotificationsWithoutAccount ==
+          showNotificationsWithoutAccount &&
       other.showLibreChatPersonalization == showLibreChatPersonalization;
 
   @override
@@ -142,6 +153,7 @@ class NativeProfileRootVisibility {
     showScheduledTasks,
     showPersonalConnections,
     showChatDataControls,
+    showNotificationsWithoutAccount,
     showLibreChatPersonalization,
   );
 }
@@ -160,13 +172,22 @@ class NativeProfileRootAccount {
 }
 
 /// The sections of the native Settings root, in the order the Flutter
-/// Settings page uses: the account card -- whom Settings is for, leading to
-/// every account and connection, with Add account under it -- then the
-/// signed-in account's own rows, the everyday settings, places, and an
-/// Advanced group that only exists while it has a row.
+/// Settings page uses: the account card -- whom Settings is for -- with the
+/// way to every account and connection under it, then the signed-in
+/// account's own rows, the everyday settings, places, and an Advanced group
+/// that only exists while it has a row.
+///
+/// With an Open WebUI account the card opens that account's profile, as the
+/// Settings app's card opens its account, and an Accounts row under it
+/// leads to every account and connection, so the two never read as two ways
+/// to one page. Without one there is no profile, and the card itself leads
+/// to the connections. Adding an account is the last row of that page, as
+/// Mail's Accounts page ends on Add Account, not a second row here.
 ///
 /// Pure, so the open sheet can be rebuilt with the same rows when a setting
-/// it depends on (Advanced) changes while it is up.
+/// it depends on (Advanced, the language) changes while it is up.
+///
+/// [appLanguageTag] is the language the app is set to, or `system`.
 ///
 /// [otherAccountCount] counts the saved Open WebUI accounts besides the
 /// active one, and is null when they could not be read in time. There may
@@ -177,71 +198,89 @@ List<NativeSheetSectionConfig> buildNativeProfileRootSections(
   required NativeProfileRootAccount? account,
   required NativeProfileRootVisibility visibility,
   required ({String title, String? subtitle}) card,
+  required String appLanguageTag,
   int? otherAccountCount = 0,
 }) {
   final hasAccount = account != null;
+  final notificationsItem = NativeSheetItemConfig(
+    id: NativeSheetRoutes.notificationSettings,
+    title: l10n.notificationsTitle,
+    sfSymbol: 'bell',
+  );
   final cardItems = <NativeSheetItemConfig>[
     NativeSheetItemConfig(
-      id: nativeAccountsDetailId,
+      id: hasAccount ? NativeSheetRoutes.profile : nativeAccountsDetailId,
       title: card.title,
       subtitle: card.subtitle,
       sfSymbol: 'person.crop.circle',
       usesProfileAvatar: true,
     ),
-    _nativeAddItem(
-      nativeAccountAddActionId,
-      title: l10n.accountsAddAccount,
-      kind: null,
-    ),
+    if (hasAccount)
+      NativeSheetItemConfig(
+        id: nativeAccountsDetailId,
+        title: l10n.accountsTitle,
+        sfSymbol: 'person.2',
+      ),
   ];
-  // What belongs to the Open WebUI account signed in.
+  // What belongs to the Open WebUI account signed in; its profile is the
+  // card above.
+  //
+  // Every root symbol is an outline at one weight, chosen to carry about the
+  // same ink in the 29 pt column: a single bubble rather than the wider
+  // pair, a head with its brain rather than the brain alone (as wide as the
+  // column and busier than its neighbours) or sparkles (solid stars, the
+  // one glyph that read as filled), and the bare voice waveform rather than
+  // one in a ring, the only ringed glyph in its group. The native sheet
+  // draws the antenna and the waveform a little larger, since their thin
+  // strokes read light at the shared size (`NativeSheetSettingsStyle
+  // .symbolPointSize(for:)`), and `calendar` as an outline, since the
+  // system symbol's header is solid.
   final accountItems = <NativeSheetItemConfig>[
     if (hasAccount) ...[
-      NativeSheetItemConfig(
-        id: NativeSheetRoutes.profile,
-        title: l10n.profileTitle,
-        sfSymbol: 'person.crop.circle',
-      ),
-      NativeSheetItemConfig(
-        id: NativeSheetRoutes.notificationSettings,
-        title: l10n.notificationsTitle,
-        sfSymbol: 'bell',
-      ),
+      notificationsItem,
       NativeSheetItemConfig(
         id: NativeSheetRoutes.aiMemory,
         title: nativeAiMemoryTitle(l10n),
-        sfSymbol: 'wand.and.stars',
+        sfSymbol: 'brain.head.profile',
       ),
       NativeSheetItemConfig(
         id: NativeSheetRoutes.dataConnection,
         title: nativeDataConnectionTitle(l10n),
-        sfSymbol: 'network',
+        sfSymbol: 'antenna.radiowaves.left.and.right',
       ),
     ] else if (visibility.showLibreChatPersonalization)
+      // LibreChat's memories, drawn with the head AI & Memory uses for Open
+      // WebUI's, in the root's one outline family.
       _nativeRootPageItem(
         nativeLibreChatPersonalizationActionId,
         title: l10n.personalization,
-        sfSymbol: 'person.crop.circle.badge.checkmark',
+        sfSymbol: 'brain.head.profile',
       ),
   ];
   // Single-line settings rows, so each title and its symbol carry the
-  // meaning without a descriptive subtitle.
+  // meaning without a descriptive subtitle. The language is the app's, not
+  // a look, so it sits beside Appearance rather than inside it.
   final appItems = <NativeSheetItemConfig>[
     NativeSheetItemConfig(
       id: NativeSheetRoutes.appearance,
       title: nativeAppearanceTitle(l10n),
-      sfSymbol: 'paintpalette',
+      sfSymbol: 'paintbrush',
     ),
+    buildNativeAppLanguageItem(l10n, languageTag: appLanguageTag),
     NativeSheetItemConfig(
       id: NativeSheetRoutes.chats,
       title: nativeChatsTitle(l10n),
-      sfSymbol: 'bubble.left.and.bubble.right',
+      sfSymbol: 'bubble.left',
     ),
     NativeSheetItemConfig(
       id: NativeSheetRoutes.voice,
       title: l10n.voice,
       sfSymbol: 'waveform',
     ),
+    // Device-level notifications, as the Flutter Settings page lists them
+    // without an account.
+    if (!hasAccount && visibility.showNotificationsWithoutAccount)
+      notificationsItem,
   ];
   // Everyday server places: things to open and use, not to configure.
   final placeItems = <NativeSheetItemConfig>[
@@ -280,28 +319,29 @@ List<NativeSheetSectionConfig> buildNativeProfileRootSections(
         sfSymbol: 'externaldrive',
       ),
   ];
+  // Like the Settings app, no group has a heading: the rows name themselves,
+  // and a footer explains a group where it needs explaining.
   return [
     NativeSheetSectionConfig(items: cardItems),
-    if (accountItems.isNotEmpty)
-      NativeSheetSectionConfig(
-        title: l10n.accountSettingsTitle,
-        items: accountItems,
-      ),
+    if (accountItems.isNotEmpty) NativeSheetSectionConfig(items: accountItems),
     NativeSheetSectionConfig(items: appItems),
     if (placeItems.isNotEmpty) NativeSheetSectionConfig(items: placeItems),
     if (advancedItems.isNotEmpty)
       NativeSheetSectionConfig(
-        title: l10n.advancedFeatures,
         footer: l10n.profileAdvancedFooter,
         items: advancedItems,
       ),
+    // About and the ways to support the app share a group, so the list
+    // ends on two groups rather than three thin ones.
     NativeSheetSectionConfig(
+      footer: l10n.supportConduitFooter,
       items: [
         NativeSheetItemConfig(
           id: NativeSheetRoutes.helpAbout,
           title: l10n.aboutApp,
           sfSymbol: 'info.circle',
         ),
+        if (DtpLiaConfig.showSupportSection) ...buildNativeSupportItems(l10n),
       ],
     ),
     if (hasAccount)
@@ -330,12 +370,6 @@ List<NativeSheetSectionConfig> buildNativeProfileRootSections(
             ),
         ],
       ),
-    NativeSheetSectionConfig(
-      title: l10n.supportConduit,
-      items: DtpLiaConfig.showSupportSection
-          ? buildNativeSupportItems(l10n)
-          : const <NativeSheetItemConfig>[],
-    ),
   ];
 }
 
@@ -350,7 +384,8 @@ const nativeLibreChatPersonalizationActionId = 'librechat-personalization';
 /// row opening its page, its accounts under it, the active one checked --
 /// then Hermes with its connections, the one in use checked, and Direct
 /// with its providers, each opening its editor. A card's empty list offers
-/// to add its first; + in the bar adds any.
+/// to add its first; Add Account, the page's last row as on Mail's Accounts
+/// page, adds any.
 ///
 /// [accounts] and [directProfiles] are null when they could not be read in
 /// time; [hermesInUseId] is null while Hermes is off.
@@ -375,8 +410,6 @@ NativeSheetDetailConfig buildNativeAccountsDetail(
   return NativeSheetDetailConfig(
     id: nativeAccountsDetailId,
     title: l10n.accountsTitle,
-    trailingActionId: nativeAccountAddActionId,
-    trailingActionSfSymbol: 'plus',
     sections: [
       if (accounts == null)
         NativeSheetSectionConfig(
@@ -413,7 +446,12 @@ NativeSheetDetailConfig buildNativeAccountsDetail(
               NativeSheetItemConfig(
                 id: '$nativeAccountServerActionId:${group.first.server.id}',
                 title: serverDisplayName(group.first.server),
-                avatarName: serverDisplayName(group.first.server),
+                // A server known only by its address gets a server symbol;
+                // initials of "127.0.0.1" would read "12".
+                sfSymbol: 'server.rack',
+                avatarName: serverIsKnownOnlyByAddress(group.first.server)
+                    ? null
+                    : serverDisplayName(group.first.server),
                 dismissOnSelect: true,
                 actionId: nativeAccountServerActionId,
                 actionValue: group.first.server.id,
@@ -489,7 +527,7 @@ NativeSheetDetailConfig buildNativeAccountsDetail(
             _nativeSwitchItem(
               id: '$nativeHermesUseActionId:${connection.id}',
               title: connection.name,
-              subtitle: hermesConnectionSummary(connection),
+              subtitle: hermesConnectionSummary(connection, l10n),
               sfSymbol: connection.mode == HermesBackendMode.desktopGateway
                   ? 'desktopcomputer'
                   : 'cloud',
@@ -558,6 +596,15 @@ NativeSheetDetailConfig buildNativeAccountsDetail(
             ),
         ],
       ),
+      NativeSheetSectionConfig(
+        items: [
+          _nativeAddItem(
+            nativeAccountsAddItemId,
+            title: l10n.accountsAddAccount,
+            kind: null,
+          ),
+        ],
+      ),
       // With one account, Settings' Sign out (or LibreChat's) already signs
       // out of it.
       if ((accounts?.length ?? 0) + libreChatAccounts.length > 1)
@@ -567,6 +614,9 @@ NativeSheetDetailConfig buildNativeAccountsDetail(
     ],
   );
 }
+
+/// Id of the Add Account row that ends the native Accounts page.
+const nativeAccountsAddItemId = 'accounts-add';
 
 /// A saved Open WebUI account under its server: switched to on a tap, but
 /// the one in use, signed in, stays put.
@@ -617,7 +667,9 @@ NativeSheetItemConfig _nativeSwitchItem({
 );
 
 /// A row, in the accent color, that closes the sheet to add an account or
-/// connection -- on the account sheet's tab for [kind], when given.
+/// connection -- on the account sheet's tab for [kind], when given. Its
+/// label has the weight of every other row; the plus in a ring, an outline
+/// with the ink of the symbols around it, says it adds.
 NativeSheetItemConfig _nativeAddItem(
   String id, {
   required String title,
@@ -625,7 +677,7 @@ NativeSheetItemConfig _nativeAddItem(
 }) => NativeSheetItemConfig(
   id: id,
   title: title,
-  sfSymbol: 'plus',
+  sfSymbol: 'plus.circle',
   accent: true,
   dismissOnSelect: true,
   showsDisclosure: false,
@@ -724,7 +776,11 @@ NativeSheetItemConfig _nativeRootPageItem(
 );
 
 /// The sections of the native Profile page. [accountProfile] supplies the
-/// About text; with none loaded the rows show it as not set.
+/// About text, gender and birthday; with none loaded the rows show them as
+/// not set.
+///
+/// The photo and every field share one group, each row saying what it holds
+/// now, as a contact card does; the password is the account's, below.
 List<NativeSheetSectionConfig> buildNativeProfileDetailSections(
   AppLocalizations l10n, {
   required String displayName,
@@ -738,48 +794,73 @@ List<NativeSheetSectionConfig> buildNativeProfileDetailSections(
         NativeSheetItemConfig(
           id: 'profile-photo',
           title: l10n.editPhoto,
-          sfSymbol: 'person.crop.circle',
+          sfSymbol: 'camera',
           showsDisclosure: true,
         ),
-      ],
-    ),
-    NativeSheetSectionConfig(
-      items: [
         NativeSheetItemConfig(
           id: 'profile-name',
           title: l10n.name,
-          subtitle: [displayName, if (hasBio) bio].join(' · '),
-          sfSymbol: 'person.text.rectangle',
+          subtitle: displayName,
+          sfSymbol: 'person',
           showsDisclosure: true,
         ),
         NativeSheetItemConfig(
           id: 'profile-about',
           title: l10n.bioLabel,
           subtitle: hasBio ? bio : l10n.notSet,
-          sfSymbol: 'text.bubble',
+          sfSymbol: 'text.quote',
           showsDisclosure: true,
         ),
         NativeSheetItemConfig(
           id: 'profile-details',
           title: l10n.profileDetails,
-          subtitle: l10n.profileDetailsSummary,
-          sfSymbol: 'person.crop.circle',
+          subtitle:
+              nativeProfileDetailsSummary(l10n, accountProfile) ??
+              l10n.profileDetailsSummary,
+          sfSymbol: 'calendar',
           showsDisclosure: true,
         ),
       ],
     ),
     NativeSheetSectionConfig(
-      title: l10n.accountSettingsTitle,
       items: [
         NativeSheetItemConfig(
           id: 'password',
           title: l10n.changePasswordTitle,
-          subtitle: l10n.passwordChangeDescription,
           sfSymbol: 'lock',
         ),
       ],
     ),
   ];
+}
+
+/// What the Profile details row holds now -- the gender and birthday set,
+/// "Female · Feb 3, 2001" -- or null when neither is.
+String? nativeProfileDetailsSummary(
+  AppLocalizations l10n,
+  AccountMetadata? profile,
+) {
+  final gender = profile?.gender?.trim() ?? '';
+  final genderLabel = switch (gender) {
+    '' => null,
+    'male' => l10n.genderMale,
+    'female' => l10n.genderFemale,
+    _ => gender,
+  };
+  final birth = DateTime.tryParse(profile?.dateOfBirth?.trim() ?? '');
+  final birthLabel = birth == null ? null : _formatBirthday(l10n, birth);
+  final parts = [?genderLabel, ?birthLabel];
+  return parts.isEmpty ? null : parts.join(' · ');
+}
+
+/// [date] as the app's language writes a date, or the default locale's way
+/// when that language's date data is not loaded.
+String _formatBirthday(AppLocalizations l10n, DateTime date) {
+  try {
+    return DateFormat.yMMMd(l10n.localeName).format(date);
+  } on Exception {
+    return DateFormat.yMMMd().format(date);
+  }
 }
 
 String? resolveNativeSheetModelName(List<Model> models, String? modelId) {
@@ -880,7 +961,10 @@ NativeAudioSheetParts buildNativeAudioSheetParts(
   final sttSegment = NativeSheetItemConfig(
     id: 'stt-engine',
     title: l10n.sttSettings,
-    subtitle: l10n.sttEngineDeviceDescription,
+    // Says what the chosen engine does, as Text to Speech's row does.
+    subtitle: appSettings.sttPreference == SttPreference.serverOnly
+        ? l10n.sttEngineServerDescription
+        : l10n.sttEngineDeviceDescription,
     sfSymbol: 'mic',
     kind: NativeSheetItemKind.segment,
     value: appSettings.sttPreference.name,
@@ -1128,14 +1212,16 @@ NativeAudioSheetParts buildNativeAudioSheetParts(
 
   return NativeAudioSheetParts(
     mainSections: [
+      // The call mode's row shows its value on one line; what the mode does
+      // is the group's footer, as Settings explains a choice.
       NativeSheetSectionConfig(
+        footer: appSettings.voiceCallMode == VoiceCallMode.auto
+            ? l10n.voiceCallModeRealtimeDescription
+            : l10n.voiceCallModeStandardDescription,
         items: [
           NativeSheetItemConfig(
             id: 'voice-call-mode',
             title: l10n.voiceCallModeTitle,
-            subtitle: appSettings.voiceCallMode == VoiceCallMode.auto
-                ? l10n.voiceCallModeRealtimeDescription
-                : l10n.voiceCallModeStandardDescription,
             sfSymbol: 'phone.badge.waveform',
             kind: NativeSheetItemKind.segment,
             value: appSettings.voiceCallMode.name,
@@ -1367,6 +1453,115 @@ NativeSheetSectionConfig buildNativeNotificationTargetsSection(
   );
 }
 
+/// Control id of the native push switch.
+const nativePushEnabledId = 'push-enabled';
+
+/// Control id a native push target row sends, with the target's scope as its
+/// value, to open that target's Flutter detail sheet.
+const nativePushTargetActionId = 'push-target';
+
+/// Control id the native "How push stays private" row sends.
+const nativePushPrivacyActionId = 'push-privacy';
+
+/// The Push notifications group of the native Notifications sheet: the
+/// switch, and while push is on, a row into the per-target detail. [push] is
+/// null where push was never turned on.
+NativeSheetSectionConfig buildNativePushSection(
+  AppLocalizations l10n,
+  PushState? push,
+) {
+  final available = push?.available ?? true;
+  final enabled = push?.enabled ?? false;
+  // On while push can no longer work here, the switch still turns it off.
+  final switchable = available || enabled;
+  final attention = [
+    for (final target in push?.targets.values ?? const <PushTargetState>[])
+      if (pushTargetNeedsAttention(target)) target,
+  ];
+  return NativeSheetSectionConfig(
+    title: l10n.pushSectionTitle,
+    items: [
+      NativeSheetItemConfig(
+        id: nativePushEnabledId,
+        title: l10n.pushEnabledTitle,
+        subtitle: available
+            ? l10n.pushEnabledDescription
+            : l10n.pushUnavailableBuild,
+        sfSymbol: 'bell.badge',
+        kind: switchable
+            ? NativeSheetItemKind.toggle
+            : NativeSheetItemKind.info,
+        value: enabled,
+      ),
+      if (enabled && push != null)
+        NativeSheetItemConfig(
+          id: NativeSheetRoutes.pushTargets,
+          // Each account and connection, with its push status.
+          title: l10n.accountsTitle,
+          subtitle: attention.isEmpty
+              ? null
+              : l10n.pushAttentionChip,
+          sfSymbol: attention.isEmpty
+              ? 'checkmark.circle'
+              : 'exclamationmark.triangle',
+        ),
+      NativeSheetItemConfig(
+        id: nativePushPrivacyActionId,
+        title: l10n.pushPrivacyTitle,
+        sfSymbol: 'lock.shield',
+        dismissOnSelect: true,
+        actionId: nativePushPrivacyActionId,
+      ),
+    ],
+  );
+}
+
+/// The native list of push targets: each row says its status and opens the
+/// target's Flutter detail sheet, which has the one-tap fixes.
+NativeSheetDetailConfig buildNativePushTargetsDetail(
+  AppLocalizations l10n,
+  PushState push, {
+  required String Function(PushTarget target) titleOf,
+}) {
+  NativeSheetItemConfig row(PushTargetState target) => NativeSheetItemConfig(
+    id: '$nativePushTargetActionId:${target.scope}',
+    title: titleOf(target.target),
+    subtitle: pushStatusText(l10n, target),
+    sfSymbol: pushTargetBusy(target)
+        ? 'hourglass'
+        : pushTargetNeedsAttention(target)
+        ? 'exclamationmark.triangle'
+        : target.status == PushStatus.on
+        ? 'checkmark.circle'
+        : 'bell.slash',
+    dismissOnSelect: true,
+    actionId: nativePushTargetActionId,
+    actionValue: target.scope,
+  );
+
+  return NativeSheetDetailConfig(
+    id: NativeSheetRoutes.pushTargets,
+    title: l10n.accountsTitle,
+    sections: [
+      if (push.enabled && push.permissionDenied)
+        NativeSheetSectionConfig(
+          items: [
+            NativeSheetItemConfig(
+              id: 'push-permission-denied',
+              title: l10n.pushStatusPermissionDenied,
+              subtitle: l10n.pushExplainPermissionDenied,
+              sfSymbol: 'bell.slash',
+              kind: NativeSheetItemKind.info,
+            ),
+          ],
+        ),
+      NativeSheetSectionConfig(
+        items: [for (final target in push.targets.values) row(target)],
+      ),
+    ],
+  );
+}
+
 /// Control id the native Add memory row sends to open the Flutter editor.
 const nativeMemoryEditorNewActionId = 'memory-editor-new';
 
@@ -1517,8 +1712,6 @@ String nativeLanguageLabel(AppLocalizations l10n, String code) {
       return l10n.korean;
     case 'ja':
       return l10n.japanese;
-    case 'pt-BR':
-      return l10n.portugueseBrazilian;
     case 'zh-Hant':
       return l10n.chineseTraditional;
     default:
@@ -1530,10 +1723,28 @@ String nativeLanguageLabel(AppLocalizations l10n, String code) {
       if (normalized == 'cs') return l10n.czech;
       if (normalized == 'sk') return l10n.slovak;
       if (normalized == 'pl') return l10n.polish;
-      if (normalized == 'pt-br') return l10n.portugueseBrazilian;
       return l10n.system;
   }
 }
+
+/// Id of the App Language picker row.
+const nativeAppLanguageId = 'language';
+
+/// The App Language row: the language the app is set to ([languageTag], or
+/// `system`), picked from every language the app speaks.
+NativeSheetItemConfig buildNativeAppLanguageItem(
+  AppLocalizations l10n, {
+  required String languageTag,
+}) => NativeSheetItemConfig(
+  id: nativeAppLanguageId,
+  title: l10n.appLanguage,
+  sfSymbol: 'globe',
+  kind: NativeSheetItemKind.searchablePicker,
+  value: languageTag,
+  options: nativeLanguageDropdownOptions(l10n),
+  // It opens the list of languages, so it says so wherever it sits.
+  showsDisclosure: true,
+);
 
 List<NativeSheetOptionConfig> nativeLanguageDropdownOptions(
   AppLocalizations l10n,
@@ -1554,7 +1765,6 @@ List<NativeSheetOptionConfig> nativeLanguageDropdownOptions(
     NativeSheetOptionConfig(id: 'zh-Hant', label: l10n.chineseTraditional),
     NativeSheetOptionConfig(id: 'ko', label: l10n.korean),
     NativeSheetOptionConfig(id: 'ja', label: l10n.japanese),
-    NativeSheetOptionConfig(id: 'pt-BR', label: l10n.portugueseBrazilian),
   ];
 }
 

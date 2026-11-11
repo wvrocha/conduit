@@ -1,4 +1,6 @@
 import 'package:conduit/l10n/app_localizations.dart';
+import 'package:conduit_core/auth/auth_state_manager.dart';
+import 'package:conduit_core/auth/token_validator.dart';
 import 'package:conduit_core/features/hermes/providers/hermes_providers.dart';
 import 'package:conduit_core/features/librechat/models/librechat_account.dart';
 import 'package:conduit_core/features/librechat/providers/librechat_providers.dart';
@@ -8,6 +10,7 @@ import 'package:conduit_core/providers/backend_mode_providers.dart';
 import 'package:conduit_core/providers/openwebui_accounts_controller.dart';
 import 'package:conduit_core/providers/primary_account_switcher.dart';
 import 'package:conduit_core/utils/debug_logger.dart';
+import 'package:dio/dio.dart' show DioException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:go_router/go_router.dart';
@@ -15,6 +18,7 @@ import 'package:conduit/shared/widgets/platform_ui/platform_ui.dart';
 import 'package:conduit/shared/widgets/platform_ui/vocabulary.dart';
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/widgets.dart';
+import 'package:conduit_core/features/push/models/push_target.dart';
 
 import '../../../shared/theme/theme_extensions.dart';
 import '../../../shared/utils/ui_utils.dart';
@@ -26,6 +30,7 @@ import '../../../core/utils/account_display.dart';
 import '../../auth/views/server_connection_page.dart'
     show ServerConnectionHandoff;
 import '../../hermes/widgets/hermes_connection_switcher.dart';
+import '../../push/widgets/push_attention_chip.dart';
 import 'account_sheet.dart';
 
 export '../../../core/utils/account_display.dart';
@@ -99,6 +104,7 @@ class SavedAccountRow extends ConsumerWidget {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              PushAttentionChip(scope: PushTarget.openWebUiScope(entry.id)),
               if (entry.isActive)
                 ActiveCheckmark(semanticLabel: l10n.accountsActive),
               if (showSignOut)
@@ -148,19 +154,32 @@ class ActiveCheckmark extends StatelessWidget {
 /// Makes [connectionId] the Hermes connection in use, turning Hermes on
 /// when it is off. It is switched to first: a switch that fails leaves
 /// Hermes as it was, rather than on with the connection it was meant to
-/// leave.
-Future<void> useHermesConnection(
+/// leave. Returns whether the connection is in use, with Hermes on.
+Future<bool> useHermesConnection(
   BuildContext context,
   WidgetRef ref,
   String connectionId,
+) => useHermesConnectionReading(context, ref.read, connectionId);
+
+/// [useHermesConnection] for a caller that reads providers without a widget
+/// ref, such as a tapped notification.
+Future<bool> useHermesConnectionReading(
+  BuildContext context,
+  T Function<T>(ProviderListenable<T> provider) read,
+  String connectionId,
 ) async {
-  if (ref.read(hermesActiveConnectionIdProvider) != connectionId) {
-    if (!await switchHermesConnection(context, ref, connectionId)) return;
-    if (!context.mounted) return;
+  if (read(hermesActiveConnectionIdProvider) != connectionId) {
+    final switched = await switchHermesConnectionOf(
+      context,
+      read(hermesConfigProvider.notifier),
+      connectionId,
+    );
+    if (!switched || !context.mounted) return false;
   }
-  if (ref.read(hermesEnabledProvider)) return;
+  if (read(hermesEnabledProvider)) return true;
   try {
-    await ref.read(hermesConfigProvider.notifier).setEnabled(true);
+    await read(hermesConfigProvider.notifier).setEnabled(true);
+    return true;
   } catch (error, stackTrace) {
     DebugLogger.error(
       'hermes-enable-failed',
@@ -174,6 +193,7 @@ Future<void> useHermesConnection(
         AppLocalizations.of(context)!.errorMessage,
       );
     }
+    return false;
   }
 }
 
@@ -195,7 +215,7 @@ Future<void> signOutOfAllAccounts(BuildContext context, WidgetRef ref) async {
 /// Makes [accountId] the active account, asking first when that would stop
 /// a reply that is still being written, and opens its sign-in when it needs
 /// one.
-Future<void> switchToSavedAccount(
+Future<OpenWebUiAccountChangeResult?> switchToSavedAccount(
   BuildContext context,
   WidgetRef ref,
   String accountId,
@@ -215,19 +235,21 @@ Future<void> switchToSavedAccount(
       (force) => switcher.useOpenWebUi(accountId, force: force),
     );
     if (used) router.go(Routes.chat);
-    return;
+    // The account was not in use while LibreChat was.
+    return used ? OpenWebUiAccountChangeResult.done : null;
   }
   final controller = ref.read(openWebUiAccountsControllerProvider);
   try {
-    var result = await controller.switchTo(accountId);
-    if (result == OpenWebUiAccountChangeResult.blockedByActiveReply) {
-      if (!context.mounted) return;
-      if (!await _confirmSwitchStopsReply(context)) return;
-      result = await controller.switchTo(accountId, force: true);
-    }
+    final result = await switchOpenWebUiAccountConfirming(
+      controller,
+      accountId,
+      confirmStopReply: () async =>
+          context.mounted && await confirmSwitchStopsReply(context),
+    );
     if (result == OpenWebUiAccountChangeResult.needsSignIn) {
-      _openSignIn(router);
+      openActiveAccountSignIn(router);
     }
+    return result;
   } catch (error, stackTrace) {
     DebugLogger.error(
       'account-switch-failed',
@@ -236,7 +258,79 @@ Future<void> switchToSavedAccount(
       stackTrace: stackTrace,
     );
     if (context.mounted) UiUtils.showMessage(context, l10n.errorMessage);
+    return null;
   }
+}
+
+/// For signing in to the account in use while the app still takes it for
+/// signed in, as when a push check found its session refused: switching to
+/// it only answers that it is already active.
+///
+/// Asks its server about the session. A token past its expiry, or one the
+/// server refuses, goes through the app's own expired-session flow
+/// ([AuthStateManager.onTokenInvalidated]: a silent sign-in with saved
+/// credentials, else sign-in). Answers whether the session still works; a
+/// server that cannot be reached says nothing against it, and neither does
+/// a refusal that comes after the account or its session changed.
+Future<bool> recheckActiveAccountSession(ProviderContainer container) async {
+  final api = container.read(apiServiceProvider);
+  final token = api?.authToken;
+  final expired =
+      api == null ||
+      token == null ||
+      token.isEmpty ||
+      TokenValidator.validateTokenFormat(token).isExpired;
+  if (!expired) {
+    // Listened to while the server answers, so that signing out and in again
+    // with the same token (an API key) still counts as another session.
+    final session = container.listen(
+      openWebUiAuthSessionEpochProvider,
+      (_, _) {},
+    );
+    final epoch = session.read();
+    try {
+      await api.getCurrentUser(
+        suppressAuthFailureNotification: true,
+        authSnapshot: api.captureAuthSnapshot(),
+      );
+      return true;
+    } on DioException catch (error) {
+      if (error.response?.statusCode != 401) return true;
+      // The expired-session flow clears whatever session is current. A
+      // switch or a sign-in while the server answered made another one
+      // current, which this refusal says nothing about.
+      final current = container.read(apiServiceProvider);
+      if (current?.serverConfig.id != api.serverConfig.id ||
+          current?.authToken != token ||
+          !identical(session.read(), epoch)) {
+        return true;
+      }
+    } finally {
+      session.close();
+    }
+  }
+  await container.read(authStateManagerProvider.notifier).onTokenInvalidated();
+  return false;
+}
+
+/// Makes [accountId] the active account through [controller], asking
+/// [confirmStopReply] first when that would stop a reply still being
+/// written. Returns how the change went, or null when the user kept the
+/// reply.
+///
+/// [switchToSavedAccount] and a tapped notification both switch through this,
+/// so they ask, and stop the reply, alike.
+Future<OpenWebUiAccountChangeResult?> switchOpenWebUiAccountConfirming(
+  OpenWebUiAccountsController controller,
+  String accountId, {
+  required Future<bool> Function() confirmStopReply,
+}) async {
+  final result = await controller.switchTo(accountId);
+  if (result != OpenWebUiAccountChangeResult.blockedByActiveReply) {
+    return result;
+  }
+  if (!await confirmStopReply()) return null;
+  return controller.switchTo(accountId, force: true);
 }
 
 /// Whether the active account may be left for one being signed in to: at
@@ -254,7 +348,7 @@ Future<bool> confirmLeavingActiveAccount(
   ref.read,
   guard: accountChangeReplyGuardProvider,
   stop: accountChangeStopRepliesProvider,
-  confirm: () => _confirmSwitchStopsReply(context),
+  confirm: () => confirmSwitchStopsReply(context),
 );
 
 /// Whether the address the active account uses may be changed or removed:
@@ -310,9 +404,12 @@ Future<bool> _mayStopReply(
 /// to a usable Hermes or Direct backend the router lets the user stay where
 /// they were, with the account they chose unusable. Sign-in becomes the
 /// router's location, so the router moves on to chat once it succeeds.
-void _openSignIn(GoRouter router) => router.go(Routes.authentication);
+void openActiveAccountSignIn(GoRouter router) =>
+    router.go(Routes.authentication);
 
-Future<bool> _confirmSwitchStopsReply(BuildContext context) {
+/// Asks whether to switch accounts although that stops the reply still
+/// being written.
+Future<bool> confirmSwitchStopsReply(BuildContext context) {
   final l10n = AppLocalizations.of(context)!;
   return ThemedDialogs.confirm(
     context,
@@ -379,7 +476,7 @@ Future<void> signOutOfSavedAccount(
     // on with Hermes or Direct, or the router goes back to choosing one.
     if (result == OpenWebUiAccountChangeResult.needsSignIn &&
         await container.read(activeServerProvider.future) != null) {
-      _openSignIn(router);
+      openActiveAccountSignIn(router);
     }
   } catch (error, stackTrace) {
     DebugLogger.error(
@@ -430,7 +527,7 @@ Future<bool> _usePrimary(
     var result = await change(false);
     if (result == PrimarySwitchResult.blockedByActiveReply) {
       if (!context.mounted) return false;
-      if (!await _confirmSwitchStopsReply(context)) return false;
+      if (!await confirmSwitchStopsReply(context)) return false;
       result = await change(true);
     }
     // An account gone by the time the switch ran (signed out of meanwhile)

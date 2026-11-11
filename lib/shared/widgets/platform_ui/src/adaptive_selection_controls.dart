@@ -1,5 +1,6 @@
 import 'package:cupertino_native_better/cupertino_native_better.dart';
 import 'package:cupertino_ui/cupertino_ui.dart';
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/services/haptic_service.dart';
@@ -97,6 +98,10 @@ class AdaptiveSwitch extends StatelessWidget {
 /// draws a tick mark at each step. Sliders with more steps still snap to them.
 const int kAdaptiveSliderMaxTickedDivisions = 12;
 
+/// How far the Cupertino slider's thumb centre stays from either end of the
+/// slider: its padding (cupertino_ui's `_kPadding`) and the thumb's radius.
+const double _kCupertinoThumbTravelInset = 8 + CupertinoThumbPainter.radius;
+
 class AdaptiveSlider extends StatefulWidget {
   const AdaptiveSlider({
     super.key,
@@ -113,6 +118,7 @@ class AdaptiveSlider extends StatefulWidget {
     this.semanticLabel,
     this.semanticValue,
     this.thumbless = false,
+    this.seekOnTap = false,
   });
 
   final double value;
@@ -132,12 +138,30 @@ class AdaptiveSlider extends StatefulWidget {
   /// Music. Other platforms keep their slider.
   final bool thumbless;
 
+  /// Whether a tap on the track moves the value to the tapped point, as a
+  /// media scrubber does, reported as a change from start to end. The iOS
+  /// sliders otherwise only follow a drag (and the Cupertino one only from
+  /// near its thumb); the Material slider always does this.
+  final bool seekOnTap;
+
   @override
   State<AdaptiveSlider> createState() => _AdaptiveSliderState();
 }
 
 class _AdaptiveSliderState extends State<AdaptiveSlider> {
   int? _lastHapticStep;
+
+  /// Where a press on the Cupertino slider began, until it moves far enough
+  /// to be a drag.
+  Offset? _pressedAt;
+
+  /// The value a touch on an iOS slider started from, until the touch
+  /// changes it. Both report the start and the end of a touch that moves
+  /// nothing: UIKit's slider for every touch, such as a tap, and the
+  /// Cupertino one for a press on its thumb. Only a touch that changes the
+  /// value is reported, as the Material slider does.
+  double? _touchStartValue;
+  bool _touchChanged = false;
 
   @override
   void initState() {
@@ -186,17 +210,93 @@ class _AdaptiveSliderState extends State<AdaptiveSlider> {
           );
   }
 
+  void _onTouchStart(double value) {
+    _touchStartValue = value;
+    _touchChanged = false;
+  }
+
+  void _onTouchChanged(double value) {
+    final start = _touchStartValue;
+    if (start != null && !_touchChanged) {
+      // The Cupertino slider reports the value it starts from.
+      if (value == start) return;
+      _touchChanged = true;
+      widget.onChangeStart?.call(start);
+    }
+    // A press the slider moves the value for is its drag, never a tap.
+    _pressedAt = null;
+    _handleChanged(value);
+  }
+
+  void _onTouchEnd(double value) {
+    final changed = _touchChanged;
+    _touchStartValue = null;
+    _touchChanged = false;
+    if (changed) widget.onChangeEnd?.call(value);
+  }
+
+  /// A tap on the Cupertino slider moves the value to the tapped point,
+  /// along the travel of the thumb's centre. On its own it follows only a
+  /// drag that starts near its thumb. The iOS 26 slider seeks on a tap
+  /// itself.
+  Widget _seekingOnTap(Widget slider) {
+    const inset = _kCupertinoThumbTravelInset;
+    return Listener(
+      // Raw pointer events reach this listener whether or not the slider
+      // takes the gesture, across the whole track.
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) => _pressedAt = event.localPosition,
+      onPointerMove: (event) {
+        final pressedAt = _pressedAt;
+        if (pressedAt != null &&
+            (event.localPosition - pressedAt).distance > kTouchSlop) {
+          // A drag, even one that comes back, is the slider's own.
+          _pressedAt = null;
+        }
+      },
+      onPointerCancel: (_) => _pressedAt = null,
+      onPointerUp: (event) {
+        final pressedAt = _pressedAt;
+        _pressedAt = null;
+        // The slider's own width, which can be less than the room it is
+        // offered.
+        final travel = (context.size?.width ?? 0) - 2 * inset;
+        if (widget.onChanged == null ||
+            pressedAt == null ||
+            travel <= 0 ||
+            widget.max <= widget.min) {
+          return;
+        }
+        var along = ((event.localPosition.dx - inset) / travel).clamp(
+          0.0,
+          1.0,
+        );
+        if (Directionality.of(context) == TextDirection.rtl) along = 1 - along;
+        final divisions = widget.divisions;
+        if (divisions != null && divisions > 0) {
+          along = (along * divisions).round() / divisions;
+        }
+        final value = widget.min + along * (widget.max - widget.min);
+        widget.onChangeStart?.call(widget.value);
+        _handleChanged(value);
+        widget.onChangeEnd?.call(value);
+      },
+      child: slider,
+    );
+  }
+
   Widget _buildSlider(BuildContext context) {
-    if (PlatformUiCapabilities.usesNativeIOS26 &&
-        widget.onChangeStart == null &&
-        widget.onChangeEnd == null) {
+    if (PlatformUiCapabilities.usesNativeIOS26) {
       final divisions = widget.divisions;
       return CNSlider(
         value: widget.value.clamp(widget.min, widget.max),
         min: widget.min,
         max: widget.max,
         enabled: widget.onChanged != null,
-        onChanged: widget.onChanged == null ? (_) {} : _handleChanged,
+        onChanged: widget.onChanged == null ? (_) {} : _onTouchChanged,
+        onChangeStart: _onTouchStart,
+        onChangeEnd: _onTouchEnd,
+        seekOnTap: widget.seekOnTap,
         trackColor: widget.activeColor,
         thumbColor: widget.thumbColor,
         style: widget.thumbless
@@ -215,17 +315,18 @@ class _AdaptiveSliderState extends State<AdaptiveSlider> {
       );
     }
     if (PlatformUiCapabilities.isIOS) {
-      return CupertinoSlider(
+      final slider = CupertinoSlider(
         value: widget.value.clamp(widget.min, widget.max),
         min: widget.min,
         max: widget.max,
-        onChanged: widget.onChanged == null ? null : _handleChanged,
-        onChangeStart: widget.onChangeStart,
-        onChangeEnd: widget.onChangeEnd,
+        onChanged: widget.onChanged == null ? null : _onTouchChanged,
+        onChangeStart: _onTouchStart,
+        onChangeEnd: _onTouchEnd,
         activeColor: widget.activeColor,
         thumbColor: widget.thumbColor ?? CupertinoColors.white,
         divisions: widget.divisions,
       );
+      return widget.seekOnTap ? _seekingOnTap(slider) : slider;
     }
     return Slider(
       value: widget.value.clamp(widget.min, widget.max),
